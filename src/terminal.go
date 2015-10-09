@@ -14,6 +14,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/skratchdot/open-golang/open"
+
 	C "github.com/junegunn/fzf/src/curses"
 	"github.com/junegunn/fzf/src/util"
 
@@ -300,7 +302,12 @@ func (t *Terminal) output() bool {
 	if !found {
 		cnt := t.merger.Length()
 		if cnt > 0 && cnt > t.cy {
-			fmt.Println(t.merger.Get(t.cy).AsString(t.ansi))
+			desc := t.merger.Get(t.cy).AsString(t.ansi)
+			pair := strings.Split(desc, " - ")
+			err := open.Run(pair[1])
+			if err != nil {
+				println(err)
+			}
 			found = true
 		}
 	} else {
@@ -310,7 +317,8 @@ func (t *Terminal) output() bool {
 		}
 		sort.Sort(byTimeOrder(sels))
 		for _, sel := range sels {
-			fmt.Println(*sel.text)
+			open.Run(*sel.text)
+			//fmt.Println(*sel.text)
 		}
 	}
 	return found
@@ -791,11 +799,14 @@ func (t *Terminal) Loop() {
 						C.Refresh()
 						t.printAll()
 					case reqClose:
-						C.Close()
-						if t.output() {
-							exit(exitOk)
-						}
-						exit(exitNoMatch)
+						t.output()
+						t.input = []rune{}
+						t.cx = 0
+						C.Clear()
+						C.Endwin()
+						C.Refresh()
+						t.printAll()
+
 					case reqQuit:
 						C.Close()
 						exit(exitInterrupt)
@@ -818,7 +829,7 @@ func (t *Terminal) Loop() {
 		req := func(evts ...util.EventType) {
 			for _, event := range evts {
 				events = append(events, event)
-				if event == reqClose || event == reqQuit {
+				if event == reqQuit {
 					looping = false
 				}
 			}
